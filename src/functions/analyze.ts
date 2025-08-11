@@ -1,12 +1,21 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { withApiKeyAuth } from "../middleware/keys-middleware";
+import { getMilestoneById } from "../db/queries/milestones-queries";
 
 export async function analyze(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
 
-    const name = request.query.get('name') || await request.text() || 'world';
+    try {
+        const milestone = await getMilestoneById(1);
 
-    return { body: `Hello, ${name}!` };
+        if (!milestone) {
+            return { status: 404, jsonBody: { error: "Milestone not found" } };
+        }
+
+        return { status: 200, jsonBody: milestone };
+    } catch (error) {
+        context.log("Error fetching milestone:", error as any);
+        return { status: 500, jsonBody: { error: "Internal server error" } };
+    }
 };
 
 app.http('analyze', {
