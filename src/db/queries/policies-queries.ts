@@ -8,3 +8,11 @@ export async function getPolicyById(id: number) {
   return row;
 }
 
+export async function getDefaultPolicy() {
+  const rows = await db
+    .select()
+    .from(policies)
+    .where(eq(policies.isDefault, true))
+    .limit(1);
+  return rows[0] ?? null;
+}
