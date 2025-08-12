@@ -12,6 +12,7 @@ import {
   getPolicyById,
 } from "../db/queries/policies-queries";
 import { GoogleGenAI, Type } from "@google/genai";
+import { withApiKeyAuth } from "../middleware/keys-middleware";
 
 export async function analyze(
   request: HttpRequest,
@@ -207,5 +208,5 @@ export async function analyze(
 app.http("analyze", {
   methods: ["GET", "POST"],
   authLevel: "anonymous",
-  handler: analyze,
+  handler: withApiKeyAuth(analyze),
 });
