@@ -1,0 +1,64 @@
+import { HttpRequest } from "@azure/functions";
+import { ParsedVideo } from "./types";
+
+const EXT_TO_MIME: Record<string, string> = {
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  mpeg: "video/mpeg",
+  mpg: "video/mpeg",
+  m4v: "video/mp4",
+  qt: "video/quicktime",
+  "3gp": "video/3gpp",
+  "3gpp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  "3gpp2": "video/3gpp2",
+};
+
+export interface ParsedForm {
+  milestoneId: number;
+  video: ParsedVideo;
+}
+
+export async function parseAnalyzeForm(request: HttpRequest): Promise<ParsedForm> {
+  const formData = await request.formData();
+  const video = formData.get("video");
+  const milestoneIdRaw = formData.get("milestoneId");
+
+  if (!(video instanceof File)) {
+    throw new Error("INVALID_VIDEO");
+  }
+
+  let milestoneId: number | null = null;
+  if (typeof milestoneIdRaw === "string") {
+    const parsed = parseInt(milestoneIdRaw);
+    if (!isNaN(parsed)) milestoneId = parsed;
+  } else if (typeof milestoneIdRaw === "number") {
+    milestoneId = milestoneIdRaw;
+  }
+
+  if (!Number.isInteger(milestoneId)) {
+    throw new Error("INVALID_MILESTONE_ID");
+  }
+
+  const fileObj = video as File;
+  const arrayBuffer = await fileObj.arrayBuffer();
+  const base64Video = Buffer.from(arrayBuffer).toString("base64");
+
+  const reportedType = (fileObj.type || "").toLowerCase();
+  const isGeneric = !reportedType || reportedType === "application/octet-stream";
+  const fileExt = (fileObj.name.split(".").pop() || "").toLowerCase();
+  const inferredType = EXT_TO_MIME[fileExt] || "video/mp4";
+  const mimeType = isGeneric ? inferredType : reportedType;
+
+  return {
+    milestoneId: milestoneId as number,
+    video: {
+      base64Video,
+      mimeType,
+      fileName: fileObj.name,
+    },
+  };
+}
+
+
