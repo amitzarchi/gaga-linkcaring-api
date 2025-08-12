@@ -1,11 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ModelResponse, ParsedVideo } from "./types";
+import { ModelResponse, ParsedVideo, RunVideoAnalysisResult } from "./types";
 
 export async function runVideoAnalysis(
   video: ParsedVideo,
   prompt: string,
   modelId: string
-): Promise<ModelResponse> {
+): Promise<RunVideoAnalysisResult> {
   const contents = [
     {
       inlineData: {
@@ -49,8 +49,11 @@ export async function runVideoAnalysis(
   console.log(`Time taken to send request to google: ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
   try {
-    const parsed = JSON.parse(response.text);
-    return parsed as ModelResponse;
+    const parsed = JSON.parse(response.text) as ModelResponse;
+    return {
+      totalTokenCount: response.usageMetadata?.totalTokenCount,
+      ModelResponse: parsed,
+    };
   } catch (err) {
     throw new Error("MODEL_RESPONSE_PARSE_ERROR");
   }

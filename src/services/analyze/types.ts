@@ -8,6 +8,11 @@ export interface ModelResponse {
   confidence: number; // 0-1 from model
 }
 
+export interface RunVideoAnalysisResult {
+  totalTokenCount: number | undefined;
+  ModelResponse: ModelResponse;
+}
+
 export interface PolicyThreshold {
   minValidatorsPassed: number; // 0-100 percent
   minConfidence: number; // 0-100 percent

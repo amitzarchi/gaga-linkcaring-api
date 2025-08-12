@@ -7,6 +7,7 @@ import {
   timestamp,
   boolean,
   uniqueIndex,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 import { sql } from "drizzle-orm";
@@ -132,3 +133,35 @@ export const models = pgTable(
       .where(sql`${table.isActive} = true`),
   ]
 );
+
+export const responseStatus = pgEnum("response_status", ["SUCCESS", "ERROR"]);
+
+export const responseStats = pgTable("response_stats", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+
+  // Auth
+  apiKeyId: integer("api_key_id").references(() => apiKeys.id, { onDelete: "set null"}),
+
+  // Request context
+  milestoneId: integer("milestone_id").references(() => milestones.id),
+  systemPromptId: integer("system_prompt_id").references(() => systemPromptHistory.id),
+  policyId: integer("policy_id").references(() => policies.id),
+
+  // Model info
+  model: text("model"),
+  totalTokenCount: integer("total_token_count"),
+
+  // Result summary
+  status: responseStatus("status").notNull(),
+  httpStatus: integer("http_status"),
+  errorCode: text("error_code"),
+  result: boolean("result"),
+  confidence: integer("confidence"), // 0-100
+  validatorsTotal: integer("validators_total"),
+  validatorsPassed: integer("validators_passed"),
+  processingMs: integer("processing_ms"),
+
+  // Meta
+  requestId: text("request_id"),
+});
