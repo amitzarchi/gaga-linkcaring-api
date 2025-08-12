@@ -3,7 +3,8 @@ import { ModelResponse, ParsedVideo } from "./types";
 
 export async function runVideoAnalysis(
   video: ParsedVideo,
-  prompt: string
+  prompt: string,
+  modelId: string
 ): Promise<ModelResponse> {
   const contents = [
     {
@@ -18,7 +19,7 @@ export async function runVideoAnalysis(
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
   const startTime = performance.now();
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: modelId,
     contents,
     config: {
       responseMimeType: "application/json",

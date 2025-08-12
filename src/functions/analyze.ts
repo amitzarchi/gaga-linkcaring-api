@@ -8,6 +8,7 @@ import { parseAnalyzeForm } from "../services/analyze/parse-request";
 import { buildPrompt } from "../services/analyze/prompt";
 import { runVideoAnalysis } from "../services/analyze/model";
 import { evaluatePolicy } from "../services/analyze/policy";
+import { getActiveModel } from "../db/queries/models-queries";
 
 export async function analyze(
   request: HttpRequest,
@@ -18,10 +19,11 @@ export async function analyze(
   try {
     const { milestoneId, video } = await parseAnalyzeForm(request);
 
-    const [milestone, milestoneValidators, systemPrompt] = await Promise.all([
+    const [milestone, milestoneValidators, systemPrompt, activeModel] = await Promise.all([
       getMilestoneById(milestoneId),
       getValidatorsByMilestone(milestoneId),
       getCurrentSystemPrompt(),
+      getActiveModel(),
     ]);
 
     if (!milestone) {
@@ -42,7 +44,11 @@ export async function analyze(
       validators: milestoneValidators,
     });
 
-    const responseJson = await runVideoAnalysis(video, finalPrompt);
+    if (!activeModel) {
+      return { status: 500, jsonBody: { error: "Internal server error" } };
+    }
+
+    const responseJson = await runVideoAnalysis(video, finalPrompt, activeModel.model);
 
     const policy = milestone.policyId
       ? await getPolicyById(milestone.policyId)
