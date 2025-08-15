@@ -20,29 +20,17 @@ const EXT_TO_MIME: Record<string, string> = {
 export function isValidR2Url(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    
-    // Must be HTTPS
-    if (parsedUrl.protocol !== 'https:') {
-      return false;
-    }
-    
+        
     // Check if it's a Cloudflare R2 URL for the gaga-linkcaring bucket
     // R2 URLs can be in format: https://gaga-linkcaring.r2.cloudflarestorage.com/...
     // Or custom domain format, but we'll focus on the standard R2 format
     const hostname = parsedUrl.hostname.toLowerCase();
     
     // Check for standard R2 hostname pattern
-    if (hostname === 'gaga-linkcaring.r2.cloudflarestorage.com') {
+    if (hostname.includes('r2.cloudflarestorage.com') && hostname.includes('gaga-linkcaring')) {
       return true;
     }
-    
-    // Check for R2 presigned URL pattern with account ID
-    // Format: https://<account-id>.r2.cloudflarestorage.com/gaga-linkcaring/...
-    if (hostname.endsWith('.r2.cloudflarestorage.com')) {
-      const pathParts = parsedUrl.pathname.split('/').filter(part => part.length > 0);
-      return pathParts.length > 0 && pathParts[0] === 'gaga-linkcaring';
-    }
-    
+        
     return false;
   } catch {
     return false;
@@ -98,7 +86,6 @@ export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
       : getMimeTypeFromUrl(url);
     
     const fileName = getFileNameFromUrl(url);
-    
     return {
       base64Video,
       mimeType,
