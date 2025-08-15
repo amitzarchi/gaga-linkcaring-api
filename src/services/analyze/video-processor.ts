@@ -1,12 +1,18 @@
 import { HttpRequest } from "@azure/functions";
+import { FormData } from "undici";
 import { ParsedVideo } from "./types";
 import { isValidR2Url, fetchVideoFromUrl } from "./video-url-utils";
 
+export interface VideoProcessingResult {
+  formData: FormData;
+  preProcessedVideo?: ParsedVideo;
+}
+
 /**
  * Main function to handle video processing from HTTP request
- * Returns the processed video or undefined if file should be processed by parseAnalyzeForm
+ * Returns the formData and processed video (if URL was provided)
  */
-export async function handleVideoFromRequest(request: HttpRequest): Promise<ParsedVideo | undefined> {
+export async function handleVideoFromRequest(request: HttpRequest): Promise<VideoProcessingResult> {
   const formData = await request.formData();
   const video = formData.get("video");
   const videoUrl = formData.get("videoUrl");
@@ -23,9 +29,9 @@ export async function handleVideoFromRequest(request: HttpRequest): Promise<Pars
     throw new Error("INVALID_VIDEO"); // Both provided - not allowed
   }
 
-  // If no URL provided, return undefined (will process file later)
+  // If no URL provided, return formData only (will process file later)
   if (!hasUrl || !videoUrl) {
-    return undefined;
+    return { formData };
   }
 
   // Process URL input
@@ -35,5 +41,6 @@ export async function handleVideoFromRequest(request: HttpRequest): Promise<Pars
     throw new Error("INVALID_VIDEO");
   }
   
-  return await fetchVideoFromUrl(url);
+  const preProcessedVideo = await fetchVideoFromUrl(url);
+  return { formData, preProcessedVideo };
 }

@@ -1,4 +1,5 @@
 import { HttpRequest } from "@azure/functions";
+import { FormData } from "undici";
 import { ParsedVideo } from "./types";
 
 const EXT_TO_MIME: Record<string, string> = {
@@ -21,10 +22,9 @@ export interface ParsedForm {
 }
 
 export async function parseAnalyzeForm(
-  request: HttpRequest, 
+  formData: FormData,
   preProcessedVideo?: ParsedVideo
 ): Promise<ParsedForm> {
-  const formData = await request.formData();
   const milestoneIdRaw = formData.get("milestoneId");
 
   // Parse milestone ID

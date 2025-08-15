@@ -24,12 +24,12 @@ export async function analyze(
     const apiKeyPromise: Promise<typeof apiKeys.$inferSelect> = getApiKeyByKey(extractApiKey(request));
 
     // Handle video input (file or URL) and validate
-    const preProcessedVideo = await handleVideoFromRequest(request);
+    const { formData, preProcessedVideo } = await handleVideoFromRequest(request);
     
     // Start measuring time after URL fetch (if any) and before parseAnalyzeForm
     const startTime = Date.now();
 
-    const { milestoneId, video: processedVideo } = await parseAnalyzeForm(request, preProcessedVideo);
+    const { milestoneId, video: processedVideo } = await parseAnalyzeForm(formData, preProcessedVideo);
 
     const [milestone, milestoneValidators, systemPrompt, activeModel] = await Promise.all([
       getMilestoneById(milestoneId),
