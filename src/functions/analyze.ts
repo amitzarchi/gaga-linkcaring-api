@@ -12,6 +12,7 @@ import { getActiveModel } from "../db/queries/models-queries";
 import { getApiKeyByKey } from "../db/queries/api-keys-queries";
 import { apiKeys, policies } from "../db/schema";
 import { insertResponseStat } from "../db/queries/response-stats-queries";
+import { handleVideoFromRequest } from "../services/analyze/video-processor";
 
 export async function analyze(
   request: HttpRequest,
@@ -20,10 +21,15 @@ export async function analyze(
   context.log(`Http function processed request for url "${request.url}"`);
 
   try {
-    const startTime = Date.now();
     const apiKeyPromise: Promise<typeof apiKeys.$inferSelect> = getApiKeyByKey(extractApiKey(request));
 
-    const { milestoneId, video } = await parseAnalyzeForm(request);
+    // Handle video input (file or URL) and validate
+    const preProcessedVideo = await handleVideoFromRequest(request);
+    
+    // Start measuring time after URL fetch (if any) and before parseAnalyzeForm
+    const startTime = Date.now();
+
+    const { milestoneId, video: processedVideo } = await parseAnalyzeForm(request, preProcessedVideo);
 
     const [milestone, milestoneValidators, systemPrompt, activeModel] = await Promise.all([
       getMilestoneById(milestoneId),
@@ -57,7 +63,7 @@ export async function analyze(
       return { status: 500, jsonBody: { error: "Internal server error" } };
     }
 
-    const analysis = await runVideoAnalysis(video, finalPrompt, activeModel.model);
+    const analysis = await runVideoAnalysis(processedVideo, finalPrompt, activeModel.model);
 
     const policy = await policyPromise;
     if (!policy) {
@@ -100,7 +106,6 @@ export async function analyze(
         result,
         confidence,
         validators,
-        totalTokenCount: analysis.totalTokenCount,
         policy: {
           minValidatorsPassed: policy.minValidatorsPassed,
           minConfidence: policy.minConfidence,
@@ -122,7 +127,7 @@ export async function analyze(
         apiKeyId: apiKeyRow?.id ?? null,
       });
     } catch {}
-    if (message === "INVALID_VIDEO") return { status: 400, jsonBody: { error: "Invalid or missing video file" } };
+    if (message === "INVALID_VIDEO") return { status: 400, jsonBody: { error: "Invalid or missing video file/URL, or both provided" } };
     if (message === "INVALID_MILESTONE_ID") return { status: 400, jsonBody: { error: "Invalid or missing milestone ID" } };
     return { status: 500, jsonBody: { error: "Internal server error" } };
   }

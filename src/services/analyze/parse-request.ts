@@ -20,15 +20,14 @@ export interface ParsedForm {
   video: ParsedVideo;
 }
 
-export async function parseAnalyzeForm(request: HttpRequest): Promise<ParsedForm> {
+export async function parseAnalyzeForm(
+  request: HttpRequest, 
+  preProcessedVideo?: ParsedVideo
+): Promise<ParsedForm> {
   const formData = await request.formData();
-  const video = formData.get("video");
   const milestoneIdRaw = formData.get("milestoneId");
 
-  if (!(video instanceof File)) {
-    throw new Error("INVALID_VIDEO");
-  }
-
+  // Parse milestone ID
   let milestoneId: number | null = null;
   if (typeof milestoneIdRaw === "string") {
     const parsed = parseInt(milestoneIdRaw);
@@ -39,6 +38,20 @@ export async function parseAnalyzeForm(request: HttpRequest): Promise<ParsedForm
 
   if (!Number.isInteger(milestoneId)) {
     throw new Error("INVALID_MILESTONE_ID");
+  }
+
+  // If pre-processed video is provided, use it
+  if (preProcessedVideo) {
+    return {
+      milestoneId: milestoneId as number,
+      video: preProcessedVideo,
+    };
+  }
+
+  // Otherwise, process the uploaded video file
+  const video = formData.get("video");
+  if (!(video instanceof File)) {
+    throw new Error("INVALID_VIDEO");
   }
 
   const fileObj = video as File;
