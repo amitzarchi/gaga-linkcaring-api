@@ -134,7 +134,7 @@ export async function analyze(
 }
 
 app.http("analyze", {
-  methods: ["GET", "POST"],
+  methods: ["POST"],
   authLevel: "anonymous",
   handler: withApiKeyAuth(analyze),
 });
