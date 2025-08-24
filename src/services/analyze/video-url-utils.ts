@@ -1,4 +1,7 @@
 import { ParsedVideo } from "./types";
+import { writeFileSync } from "fs";
+import { join } from "path";
+import { randomBytes } from "crypto";
 
 const EXT_TO_MIME: Record<string, string> = {
   mp4: "video/mp4",
@@ -66,7 +69,7 @@ export function getFileNameFromUrl(url: string): string {
 }
 
 /**
- * Downloads video content from a presigned R2 URL and converts it to ParsedVideo format
+ * Downloads video content from a presigned R2 URL and saves it to /tmp directory
  */
 export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
   try {
@@ -77,7 +80,19 @@ export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
     }
     
     const arrayBuffer = await response.arrayBuffer();
-    const base64Video = Buffer.from(arrayBuffer).toString("base64");
+    
+    // Generate a unique filename for the temporary file
+    const uniqueId = randomBytes(8).toString("hex");
+    const fileName = getFileNameFromUrl(url);
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const fileExt = lastDotIndex !== -1 ? fileName.substring(lastDotIndex + 1) : 'mp4';
+    const baseName = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const tempFileName = `${baseName}_${uniqueId}.${fileExt}`;
+    const filePath = join("/tmp", tempFileName);
+    
+    // Save the video file to /tmp
+    const buffer = Buffer.from(arrayBuffer);
+    writeFileSync(filePath, buffer);
     
     // Determine MIME type from URL or response headers
     const contentType = response.headers.get('content-type');
@@ -85,9 +100,8 @@ export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
       ? contentType 
       : getMimeTypeFromUrl(url);
     
-    const fileName = getFileNameFromUrl(url);
     return {
-      base64Video,
+      filePath,
       mimeType,
       fileName,
     };

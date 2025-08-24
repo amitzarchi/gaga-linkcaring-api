@@ -19,7 +19,7 @@ export interface PolicyThreshold {
 }
 
 export interface ParsedVideo {
-  base64Video: string;
+  filePath: string;
   mimeType: string;
   fileName: string;
 }

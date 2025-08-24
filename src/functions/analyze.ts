@@ -13,6 +13,20 @@ import { getApiKeyByKey } from "../db/queries/api-keys-queries";
 import { apiKeys, policies } from "../db/schema";
 import { insertResponseStat } from "../db/queries/response-stats-queries";
 import { handleVideoFromRequest } from "../services/analyze/video-processor";
+import { unlinkSync, existsSync } from "fs";
+
+/**
+ * Clean up temporary video file
+ */
+function cleanupTempFile(filePath: string): void {
+  try {
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.warn(`Failed to cleanup temporary file ${filePath}:`, error);
+  }
+}
 
 export async function analyze(
   request: HttpRequest,
@@ -20,16 +34,21 @@ export async function analyze(
 ): Promise<HttpResponseInit> {
   context.log(`Http function processed request for url "${request.url}"`);
 
+  let processedVideo: any = null;
+  let preProcessedVideo: any = null;
+
   try {
     const apiKeyPromise: Promise<typeof apiKeys.$inferSelect> = getApiKeyByKey(extractApiKey(request));
 
     // Handle video input (file or URL) and validate
-    const { formData, preProcessedVideo } = await handleVideoFromRequest(request);
+    const { formData, preProcessedVideo: preProcessed } = await handleVideoFromRequest(request);
+    preProcessedVideo = preProcessed;
     
     // Start measuring time after URL fetch (if any) and before parseAnalyzeForm
     const startTime = Date.now();
 
-    const { milestoneId, video: processedVideo } = await parseAnalyzeForm(formData, preProcessedVideo);
+    const { milestoneId, video } = await parseAnalyzeForm(formData, preProcessedVideo);
+    processedVideo = video;
 
     const [milestone, milestoneValidators, systemPrompt, activeModel] = await Promise.all([
       getMilestoneById(milestoneId),
@@ -99,6 +118,9 @@ export async function analyze(
       processingMs: duration,
     });
 
+    // Clean up temporary video file
+    cleanupTempFile(processedVideo.filePath);
+
     return {
       status: 200,
       jsonBody: {
@@ -116,6 +138,15 @@ export async function analyze(
     context.log("Error analyzing video:", error as any);
     const message = (error as Error)?.message;
     const httpStatus = message === "INVALID_VIDEO" || message === "INVALID_MILESTONE_ID" ? 400 : 500;
+    
+    // Clean up temporary video files if they were created
+    if (processedVideo && processedVideo.filePath) {
+      cleanupTempFile(processedVideo.filePath);
+    }
+    if (preProcessedVideo && preProcessedVideo.filePath) {
+      cleanupTempFile(preProcessedVideo.filePath);
+    }
+    
     try {
       const keyVal = extractApiKey(request);
       const apiKeyRow = keyVal ? await getApiKeyByKey(keyVal) : undefined;

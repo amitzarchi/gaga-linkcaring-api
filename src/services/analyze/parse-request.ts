@@ -1,6 +1,9 @@
 import { HttpRequest } from "@azure/functions";
 import { FormData } from "undici";
 import { ParsedVideo } from "./types";
+import { writeFileSync } from "fs";
+import { join } from "path";
+import { randomBytes } from "crypto";
 
 const EXT_TO_MIME: Record<string, string> = {
   mp4: "video/mp4",
@@ -56,18 +59,26 @@ export async function parseAnalyzeForm(
 
   const fileObj = video as File;
   const arrayBuffer = await fileObj.arrayBuffer();
-  const base64Video = Buffer.from(arrayBuffer).toString("base64");
+  
+  // Generate a unique filename for the temporary file
+  const uniqueId = randomBytes(8).toString("hex");
+  const fileExt = (fileObj.name.split(".").pop() || "mp4").toLowerCase();
+  const tempFileName = `video_${uniqueId}.${fileExt}`;
+  const filePath = join("/tmp", tempFileName);
+  
+  // Save the video file to /tmp
+  const buffer = Buffer.from(arrayBuffer);
+  writeFileSync(filePath, buffer);
 
   const reportedType = (fileObj.type || "").toLowerCase();
   const isGeneric = !reportedType || reportedType === "application/octet-stream";
-  const fileExt = (fileObj.name.split(".").pop() || "").toLowerCase();
   const inferredType = EXT_TO_MIME[fileExt] || "video/mp4";
   const mimeType = isGeneric ? inferredType : reportedType;
 
   return {
     milestoneId: milestoneId as number,
     video: {
-      base64Video,
+      filePath,
       mimeType,
       fileName: fileObj.name,
     },
