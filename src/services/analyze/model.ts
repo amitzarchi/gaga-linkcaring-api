@@ -16,7 +16,6 @@ export async function runVideoAnalysis(
   });
   const uploadEndTime = performance.now();
   console.log(`Time taken to upload video to Google: ${((uploadEndTime - uploadStartTime) / 1000).toFixed(2)}s`);
-  console.log(uploadedFile.uri);
   // Wait for the file to be processed (if needed)
   let file = uploadedFile;
   while (file.state === "PROCESSING") {
@@ -32,7 +31,7 @@ export async function runVideoAnalysis(
   const contents = createUserContent([
     {
       ...createPartFromUri(file.uri, file.mimeType),
-      videoMetadata: { fps: 3 }
+      videoMetadata: { fps: 2 }
     },
     prompt,
   ])
