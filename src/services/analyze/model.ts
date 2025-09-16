@@ -31,7 +31,7 @@ export async function runVideoAnalysis(
   const contents = createUserContent([
     {
       ...createPartFromUri(file.uri, file.mimeType),
-      videoMetadata: { fps: 2 }
+      videoMetadata: { fps: 1 }
     },
     prompt,
   ])
