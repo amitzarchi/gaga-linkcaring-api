@@ -15,7 +15,7 @@ export async function runVideoAnalysis(
     config: { mimeType: video.mimeType },
   });
   const uploadEndTime = performance.now();
-  console.log(`Time taken to upload video to Google: ${((uploadEndTime - uploadStartTime) / 1000).toFixed(2)}s`);
+  console.log(`upload time: ${((uploadEndTime - uploadStartTime) / 1000).toFixed(2)}s`);
   // Wait for the file to be processed (if needed)
   let file = uploadedFile;
   while (file.state === "PROCESSING") {
@@ -28,12 +28,13 @@ export async function runVideoAnalysis(
   }
 
   // Create content with file reference
+  const promptWithFailureReasons = `${prompt}\n\nInstructions for JSON output:\n- For each validator, always include 'reasonForFailure'.\n- When result is false: provide a concise explanation (<=120 chars).\n- When result is true: set 'reasonForFailure' to an empty string ''.\n- Follow the response schema exactly.`;
   const contents = createUserContent([
     {
       ...createPartFromUri(file.uri, file.mimeType),
-      videoMetadata: { fps: 1 }
+      videoMetadata: { fps: 0.5 }
     },
-    prompt,
+    promptWithFailureReasons,
   ])
 
   const startTime = performance.now();
@@ -52,7 +53,9 @@ export async function runVideoAnalysis(
               properties: {
                 description: { type: Type.STRING },
                 result: { type: Type.BOOLEAN },
+                reasonForFailure: { type: Type.STRING },
               },
+              required: ["description", "result", "reasonForFailure"],
             },
           },
           confidence: { type: Type.NUMBER },
@@ -65,7 +68,7 @@ export async function runVideoAnalysis(
     },
   });
   const endTime = performance.now();
-  console.log(`Time taken to send request to google: ${((endTime - startTime) / 1000).toFixed(2)}s`);
+  console.log(`inference time: ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
   // Clean up the uploaded file
   try {
@@ -75,10 +78,26 @@ export async function runVideoAnalysis(
   }
 
   try {
-    const parsed = JSON.parse(response.text) as ModelResponse;
+    const raw = JSON.parse(response.text) as any;
+    if (Array.isArray(raw?.validators)) {
+      for (const v of raw.validators) {
+        if (v && v.result === false && typeof v.reasonForFailure === "string" && v.reasonForFailure.trim()) {
+          console.log(`validator explanation: ${v.description} -> ${v.reasonForFailure}`);
+        }
+      }
+    }
+
+    const sanitized: ModelResponse = {
+      validators: (raw?.validators ?? []).map((v: any) => ({
+        description: v?.description,
+        result: Boolean(v?.result),
+      })),
+      confidence: Number(raw?.confidence),
+    };
+
     return {
       totalTokenCount: response.usageMetadata?.totalTokenCount,
-      ModelResponse: parsed,
+      ModelResponse: sanitized,
     };
   } catch (err) {
     throw new Error("MODEL_RESPONSE_PARSE_ERROR");

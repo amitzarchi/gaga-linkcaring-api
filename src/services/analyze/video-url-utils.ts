@@ -1,7 +1,7 @@
 import { ParsedVideo } from "./types";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 
 const EXT_TO_MIME: Record<string, string> = {
   mp4: "video/mp4",
@@ -16,6 +16,49 @@ const EXT_TO_MIME: Record<string, string> = {
   "3g2": "video/3gpp2",
   "3gpp2": "video/3gpp2",
 };
+
+// Cap filenames well under common filesystem limits (255 bytes for most Unix filesystems)
+const MAX_FILENAME_BYTES = 120;
+
+function toAsciiSlug(input: string): string {
+  // Normalize, strip diacritics, convert non-ASCII to '-'; keep [A-Za-z0-9._-]
+  const normalized = input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const ascii = normalized
+    .replace(/[^\x20-\x7E]/g, "-")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[\-_.\s]+|[\-_.\s]+$/g, "");
+  return ascii || "video";
+}
+
+function truncateToBytes(input: string, maxBytes: number): string {
+  let total = 0;
+  let out = "";
+  for (const ch of input) {
+    const size = Buffer.byteLength(ch);
+    if (total + size > maxBytes) break;
+    out += ch;
+    total += size;
+  }
+  return out;
+}
+
+function buildSafeTempFileName(originalFileName: string, uniqueId: string): string {
+  const lastDotIndex = originalFileName.lastIndexOf(".");
+  const rawExt = lastDotIndex !== -1 ? originalFileName.substring(lastDotIndex + 1) : "mp4";
+  const safeExt = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt.toLowerCase() : "mp4";
+  const rawBase = lastDotIndex !== -1 ? originalFileName.substring(0, lastDotIndex) : originalFileName;
+  const base = toAsciiSlug(rawBase);
+  const hash = createHash("sha1").update(originalFileName).digest("hex").slice(0, 8);
+
+  const suffix = `_${uniqueId}_${hash}.${safeExt}`;
+  const suffixBytes = Buffer.byteLength(suffix);
+  const allowedBaseBytes = Math.max(10, MAX_FILENAME_BYTES - suffixBytes);
+  const truncatedBase = truncateToBytes(base, allowedBaseBytes);
+  return `${truncatedBase}${suffix}`;
+}
 
 /**
  * Validates if a URL is a valid Cloudflare R2 presigned URL for the gaga-linkcaring bucket
@@ -84,10 +127,7 @@ export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
     // Generate a unique filename for the temporary file
     const uniqueId = randomBytes(8).toString("hex");
     const fileName = getFileNameFromUrl(url);
-    const lastDotIndex = fileName.lastIndexOf('.');
-    const fileExt = lastDotIndex !== -1 ? fileName.substring(lastDotIndex + 1) : 'mp4';
-    const baseName = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
-    const tempFileName = `${baseName}_${uniqueId}.${fileExt}`;
+    const tempFileName = buildSafeTempFileName(fileName, uniqueId);
     const filePath = join("/tmp", tempFileName);
     
     // Save the video file to /tmp
