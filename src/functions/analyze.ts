@@ -124,6 +124,7 @@ export async function analyze(
     return {
       status: 200,
       jsonBody: {
+        id: context.invocationId,
         milestoneId,
         result,
         confidence,

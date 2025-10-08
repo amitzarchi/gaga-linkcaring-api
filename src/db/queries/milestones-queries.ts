@@ -11,3 +11,10 @@ export async function getMilestoneById(id: number): Promise<{ name: string, poli
   return row;
 }
 
+export async function getMilestonesIds(): Promise<{ id: number, name: string }[]> {
+  const result = await db
+    .select({ id: milestones.id, name: milestones.name })
+    .from(milestones)
+    .orderBy(milestones.id);
+  return result;
+}
