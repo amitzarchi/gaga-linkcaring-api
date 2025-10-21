@@ -18,10 +18,8 @@ export interface PolicyThreshold {
   minConfidence: number; // 0-100 percent
 }
 
-export interface ParsedVideo {
-  filePath: string;
-  mimeType: string;
-  fileName: string;
-}
+export type ParsedVideo = 
+  | { type: 'file'; filePath: string; mimeType: string; fileName: string; }
+  | { type: 'youtube'; url: string; };
 
 

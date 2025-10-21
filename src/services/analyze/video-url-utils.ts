@@ -61,6 +61,24 @@ function buildSafeTempFileName(originalFileName: string, uniqueId: string): stri
 }
 
 /**
+ * Validates if a URL is a valid YouTube URL
+ */
+export function isValidYouTubeUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    
+    // Check for YouTube domains
+    return hostname === 'youtube.com' || 
+           hostname === 'www.youtube.com' || 
+           hostname === 'youtu.be' ||
+           hostname === 'm.youtube.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates if a URL is a valid Cloudflare R2 presigned URL for the gaga-linkcaring bucket
  */
 export function isValidR2Url(url: string): boolean {
@@ -141,6 +159,7 @@ export async function fetchVideoFromUrl(url: string): Promise<ParsedVideo> {
       : getMimeTypeFromUrl(url);
     
     return {
+      type: 'file',
       filePath,
       mimeType,
       fileName,

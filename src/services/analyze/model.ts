@@ -8,31 +8,46 @@ export async function runVideoAnalysis(
 ): Promise<RunVideoAnalysisResult> {
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
   
-  // Upload the video file using the Files API
-  const uploadStartTime = performance.now();
-  const uploadedFile = await ai.files.upload({
-    file: video.filePath,
-    config: { mimeType: video.mimeType },
-  });
-  const uploadEndTime = performance.now();
-  console.log(`upload time: ${((uploadEndTime - uploadStartTime) / 1000).toFixed(2)}s`);
-  // Wait for the file to be processed (if needed)
-  let file = uploadedFile;
-  while (file.state === "PROCESSING") {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    file = await ai.files.get({ name: file.name });
-  }
+  let fileUri: string;
+  let fileMimeType: string;
+  let fileName: string | undefined;
+  
+  if (video.type === 'youtube') {
+    // For YouTube URLs, use the URL directly without uploading
+    fileUri = video.url;
+    fileMimeType = 'video/*';
+    fileName = undefined;
+  } else {
+    // Upload the video file using the Files API
+    const uploadStartTime = performance.now();
+    const uploadedFile = await ai.files.upload({
+      file: video.filePath,
+      config: { mimeType: video.mimeType },
+    });
+    const uploadEndTime = performance.now();
+    console.log(`upload time: ${((uploadEndTime - uploadStartTime) / 1000).toFixed(2)}s`);
+    // Wait for the file to be processed (if needed)
+    let file = uploadedFile;
+    while (file.state === "PROCESSING") {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      file = await ai.files.get({ name: file.name });
+    }
 
-  if (file.state === "FAILED") {
-    throw new Error("VIDEO_PROCESSING_FAILED");
+    if (file.state === "FAILED") {
+      throw new Error("VIDEO_PROCESSING_FAILED");
+    }
+    
+    fileUri = file.uri;
+    fileMimeType = file.mimeType;
+    fileName = file.name;
   }
 
   // Create content with file reference
   const promptWithFailureReasons = `${prompt}\n\nInstructions for JSON output:\n- For each validator, always include 'reasonForFailure'.\n- When result is false: provide a concise explanation (<=120 chars).\n- When result is true: set 'reasonForFailure' to an empty string ''.\n- Follow the response schema exactly.`;
   const contents = createUserContent([
     {
-      ...createPartFromUri(file.uri, file.mimeType),
-      videoMetadata: { fps: 0.5 }
+      ...createPartFromUri(fileUri, fileMimeType),
+      videoMetadata: { fps: 1 }
     },
     promptWithFailureReasons,
   ])
@@ -70,11 +85,13 @@ export async function runVideoAnalysis(
   const endTime = performance.now();
   console.log(`inference time: ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
-  // Clean up the uploaded file
-  try {
-    await ai.files.delete({ name: file.name });
-  } catch (error) {
-    console.warn("Failed to delete uploaded file:", error);
+  // Clean up the uploaded file (only for non-YouTube videos)
+  if (fileName) {
+    try {
+      await ai.files.delete({ name: fileName });
+    } catch (error) {
+      console.warn("Failed to delete uploaded file:", error);
+    }
   }
 
   try {

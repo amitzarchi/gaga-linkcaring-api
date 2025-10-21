@@ -78,6 +78,7 @@ export async function parseAnalyzeForm(
   return {
     milestoneId: milestoneId as number,
     video: {
+      type: 'file',
       filePath,
       mimeType,
       fileName: fileObj.name,

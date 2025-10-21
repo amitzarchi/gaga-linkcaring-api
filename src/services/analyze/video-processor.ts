@@ -1,7 +1,7 @@
 import { HttpRequest } from "@azure/functions";
 import { FormData } from "undici";
 import { ParsedVideo } from "./types";
-import { isValidR2Url, fetchVideoFromUrl } from "./video-url-utils";
+import { isValidR2Url, isValidYouTubeUrl, fetchVideoFromUrl } from "./video-url-utils";
 
 export interface VideoProcessingResult {
   formData: FormData;
@@ -37,10 +37,18 @@ export async function handleVideoFromRequest(request: HttpRequest): Promise<Vide
   // Process URL input
   const url = (videoUrl as string).trim();
   
-  if (!isValidR2Url(url)) {
-    throw new Error("INVALID_VIDEO");
+  // Check if it's a YouTube URL
+  if (isValidYouTubeUrl(url)) {
+    const preProcessedVideo: ParsedVideo = { type: 'youtube', url };
+    return { formData, preProcessedVideo };
   }
   
-  const preProcessedVideo = await fetchVideoFromUrl(url);
-  return { formData, preProcessedVideo };
+  // Check if it's an R2 URL
+  if (isValidR2Url(url)) {
+    const preProcessedVideo = await fetchVideoFromUrl(url);
+    return { formData, preProcessedVideo };
+  }
+  
+  // Invalid URL
+  throw new Error("INVALID_VIDEO");
 }
