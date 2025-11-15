@@ -108,6 +108,7 @@ export async function runVideoAnalysis(
       validators: (raw?.validators ?? []).map((v: any) => ({
         description: v?.description,
         result: Boolean(v?.result),
+        reasonForFailure: v?.reasonForFailure,
       })),
       confidence: Number(raw?.confidence),
     };

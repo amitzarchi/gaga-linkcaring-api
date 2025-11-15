@@ -1,6 +1,7 @@
 export interface ValidatorCheck {
   description: string;
   result: boolean;
+  reasonForFailure: string;
 }
 
 export interface ModelResponse {
